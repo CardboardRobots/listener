@@ -7,28 +7,54 @@ import (
 	"google.golang.org/grpc"
 )
 
-func LogGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-	resp, err = handler(ctx, req)
-	if err != nil {
-		log.Printf("error: %v\n", err)
+func LogGRPC(split bool) grpc.UnaryServerInterceptor {
+	if split {
+		return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+			log.Println(info.FullMethod)
+			defer func() {
+				if err != nil {
+					log.Printf("\terror: %v\n", err)
+				}
+			}()
+			resp, err = handler(ctx, req)
+			return
+		}
 	}
-	return
-}
-
-func LogStreamGRPC(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
-	err = handler(srv, stream)
-	if err != nil {
-		log.Printf("error: %v\n", err)
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		defer func() {
+			if err != nil {
+				log.Printf("%v\n\terror: %v\n", info.FullMethod, err)
+			} else {
+				log.Println(info.FullMethod)
+			}
+		}()
+		resp, err = handler(ctx, req)
+		return
 	}
-	return err
 }
 
-func LogRequestGRPC(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-	log.Println(info.FullMethod)
-	return handler(ctx, req)
-}
-
-func LogStreamRequestGRPC(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
-	log.Println(info.FullMethod)
-	return handler(srv, stream)
+func LogStreamGRPC(split bool) grpc.StreamServerInterceptor {
+	if split {
+		return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+			log.Println(info.FullMethod)
+			defer func() {
+				if err != nil {
+					log.Printf("\terror: %v\n", err)
+				}
+			}()
+			err = handler(srv, stream)
+			return
+		}
+	}
+	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+		defer func() {
+			if err != nil {
+				log.Printf("%v\n\terror: %v\n", info.FullMethod, err)
+			} else {
+				log.Println(info.FullMethod)
+			}
+		}()
+		err = handler(srv, stream)
+		return
+	}
 }
